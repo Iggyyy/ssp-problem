@@ -10,7 +10,7 @@ class Pair:
         self.sum = 0
 
 class GreedySolver:
-    '''Greedy solver running in O(nlogn) time, but loses a lot on solution quality (to be measured).'''
+    '''Greedy solver running in O(n^2) time, but loses on solution quality (to be measured/defined).'''
 
     def basic_quadratic_greedy_solution(self, start_set, T) -> Tuple[int, List[List[int]]]:
         '''Generate basic greedy solution in O(nlogn) time.'''
