@@ -7,10 +7,10 @@ The goal is to find whether set can be divided into N non-overlapping subsets, e
 
 If this is not possible, then algorithm should propose achievable number (closest to N) of non-overlapping subsets.
 '''
-T = 6
+T = 32
 HIGH = 25
 LOW = 1
-SET_LEN = 20
+SET_LEN = 15
 
 
 class NaiveSolver:
@@ -59,7 +59,7 @@ class NaiveSolver:
 
 if __name__ == '__main__':
     print('Running naive solver test case')
-    set = Generator().generate_set(SET_LEN,LOW,HIGH)
+    set = Generator().generate_set_with_guaranteed_solution(SET_LEN,T,HIGH)
     print("Generated set: ", set)
     NaiveSolver().naive_exponential_max_solution(set, T)
     

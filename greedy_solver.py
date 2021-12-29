@@ -40,7 +40,7 @@ class GreedySolver:
 
 
 if __name__ == '__main__':
-    set = Generator().generate_multiset(15, 0, 5)
+    set = Generator().generate_random_multiset(15, 0, 5)
     print(f'Generated set {set}')
     solution = GreedySolver().basic_quadratic_greedy_solution(set, 8)
                     
