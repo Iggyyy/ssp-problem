@@ -13,7 +13,7 @@ class GreedySolver:
     '''Greedy solver running in O(n^2) time, but loses on solution quality (to be measured/defined).'''
 
     def basic_quadratic_greedy_solution(self, start_set, T) -> Tuple[int, List[List[int]]]:
-        '''Generate basic greedy solution in O(nlogn) time.'''
+        '''Generate basic greedy solution in O(n^2) time.'''
         solution_pretenders= list()
         start_set.sort(reverse=True)
 

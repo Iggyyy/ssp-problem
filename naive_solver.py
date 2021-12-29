@@ -56,19 +56,11 @@ class NaiveSolver:
             print(f'Found solution with {highest_number_of_valid_subsets} subsets, each of which sums up to {T}\n \
                 List of found subsets: {best_set_of_subsets}')
 
-   
-       
-
-
-
-    
-
 
 if __name__ == '__main__':
     print('Running naive solver test case')
     set = Generator().generate_set(SET_LEN,LOW,HIGH)
     print("Generated set: ", set)
     NaiveSolver().naive_exponential_max_solution(set, T)
-    #print( NaiveSolver().are_overlapping([  [1, 2, 3], [4,5,6], [12,14,7], [77] ]))
     
 
