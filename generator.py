@@ -6,7 +6,7 @@ class Generator:
     '''Problem generator'''
 
     def __init__(self) -> None:
-        pass
+        self.possible_subsets = []
     
     def generate_random_set(self, size: int, low: int = 0, high: int = 100) -> List[int]:
         '''Generate set of unique integers in range [low:high].\n
@@ -24,7 +24,7 @@ class Generator:
         return s
 
     def generate_set_with_guaranteed_solution(self, size: int, T: int, max_num: int) -> List[int]:
-        '''Generate set that has solution. 
+        '''DO NOT USE, POSSIBLE TO GET STUCK. Generate set that has solution of approx size. 
         This is a greedy algorithm that allows little extensions of size and max_num after a size^3 iterations.
         To easily generate '''
         ints = [i for i in range(0, max_num+1)]
@@ -76,7 +76,60 @@ class Generator:
 
         return set
 
+    def __gen_subsets_that_sum_to_T(self, numbers, T, partial=[]):
+        '''Generate all possible subsets from [numbers] with sum of T.'''
+        s = sum(partial)
+        #Check if partial sum equals T
+        if s == T: 
+            self.possible_subsets.append(partial)
+
+        #Stop if the T is reached
+        if s >= T:
+            return
+        
+        for i in range(len(numbers)):
+            n = numbers[i]
+            remaining = numbers[i+1:]
+            self.__gen_subsets_that_sum_to_T(remaining, T, partial + [n]) 
+
+    def generate_proceural_guaranteed_solution(self, T, dropout=.3, numbers=[]) -> List[int]:
+        '''Generate set of integers with subsets that sum of T.'''
+
+        #Generate all subsets with sum of T. If numbers list is not passed then create list of numbers in range 0-T with given dropout rate
+        self.__gen_subsets_that_sum_to_T(
+            numbers if len(numbers)>0 else list(filter(lambda _: random.random() > dropout ,[i for i in range(0, T)])), 
+            T
+            )
+
+        #Reference array to mark taken elements 
+        solution = [0 for i in range(0, T)]
+
+        for subset in self.possible_subsets:
+            #Check if all numbers are not overlapping with those already taken
+            all = True
+            for num in subset:
+                if solution[num] == 1:
+                    all = False
+
+            #Chance to drop subset in order to achieve more randomness in generated solution
+            if random.random() < dropout:
+                all = False
+
+            #Add subset to solution
+            if all:
+                for num in subset:
+                    solution[num] = 1
+
+        #Change indexes into numbers
+        ret = []
+        for num, flag in enumerate(solution):
+            if flag == 1:
+                ret.append(num)
+
+        print(f'Generated set with non-overlapping subset with sum of {T}: {set}')
+        return ret
+
 
 if __name__ == '__main__':
-    s = Generator().generate_set_with_guaranteed_solution(20, 45, 30)
-    print(f'Generated set with {len(s)} elements: {s}')
+    set = Generator().generate_proceural_guaranteed_solution(45)
+    print(set)
