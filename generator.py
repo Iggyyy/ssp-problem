@@ -1,6 +1,9 @@
 import random
 from typing import List
 import numpy as np
+import sys
+
+random.seed(321)
 
 class Generator:
     '''Problem generator'''
@@ -87,6 +90,7 @@ class Generator:
         if s >= T:
             return
         
+        #Create all possible combinations
         for i in range(len(numbers)):
             n = numbers[i]
             remaining = numbers[i+1:]
@@ -94,15 +98,14 @@ class Generator:
 
     def generate_proceural_guaranteed_solution(self, T, dropout=.3, numbers=[]) -> List[int]:
         '''Generate set of integers with subsets that sum of T.'''
-
         #Generate all subsets with sum of T. If numbers list is not passed then create list of numbers in range 0-T with given dropout rate
         self.__gen_subsets_that_sum_to_T(
             numbers if len(numbers)>0 else list(filter(lambda _: random.random() > dropout ,[i for i in range(0, T)])), 
             T
             )
-
         #Reference array to mark taken elements 
         solution = [0 for i in range(0, T)]
+        subset_count = 0
 
         for subset in self.possible_subsets:
             #Check if all numbers are not overlapping with those already taken
@@ -119,6 +122,7 @@ class Generator:
             if all:
                 for num in subset:
                     solution[num] = 1
+                subset_count+=1
 
         #Change indexes into numbers
         ret = []
@@ -126,7 +130,7 @@ class Generator:
             if flag == 1:
                 ret.append(num)
 
-        print(f'Generated set with non-overlapping subset with sum of {T}: {set}')
+        print(f'Generated set with {subset_count} non-overlapping subsets each of which has the sum of {T}: {set}', file=sys.stderr)
         return ret
 
 

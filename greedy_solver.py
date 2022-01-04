@@ -12,6 +12,7 @@ class Pair:
 class GreedySolver:
     '''Greedy solver running in O(n^2) time, but loses on solution quality (to be measured/defined).'''
 
+    #TODO fix this -> solution should cover all elements??
     def basic_quadratic_greedy_solution(self, start_set, T) -> Tuple[int, List[List[int]]]:
         '''Generate basic greedy solution in O(n^2) time.'''
         solution_pretenders= list()
@@ -40,9 +41,11 @@ class GreedySolver:
 
 
 if __name__ == '__main__':
-    set = Generator().generate_random_multiset(15, 0, 5)
+    T = 65
+    generator = Generator()
+    set = generator.generate_proceural_guaranteed_solution(T)
     print(f'Generated set {set}')
-    solution = GreedySolver().basic_quadratic_greedy_solution(set, 8)
+    solution = GreedySolver().basic_quadratic_greedy_solution(set, T)
                     
             
 
