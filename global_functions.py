@@ -33,6 +33,12 @@ def filter_sets_by_sum_T(list_of_sets, T) -> List[List[int]]:
     '''Filter list of sets to leave only those who sum up to T.'''
     return list(filter(lambda x: sum(x) == T ,list_of_sets))
 
+def calculate_penalty(T:int, list_of_sets:list, leftovers:list, penalty_magnitude:int=1) -> float:
+    '''Calculate penalty for solution given T, subsets, leftovers. \n
+    At the moment, penalty is number of leftovers*penalty_magnitude / number of items in subsets '''
+    count = sum([len(set) for set in list_of_sets])
+
+    return (len(leftovers) * penalty_magnitude) / (0.0001 if count == 0 else count)
 
 if __name__ == '__main__':
 
