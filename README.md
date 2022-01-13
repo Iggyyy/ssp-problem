@@ -21,7 +21,11 @@ generator.py
 - generate_random_set -> generowanie losowego problemu bez żadnych gwarancji
 
 global_functions.py
-- calculate_penalty -> obliczyć karę dla danego solution
+- calculate_penalty -> obliczyć karę dla danego solution, na ten moment kara to liczba leftovers/liczba wszystkich elementów (basically %)
 
 greedy_solver.py
 - basic_quadratic_greedy_solution -> zachłanne rozwiązanie
+
+***
+## GRASP approach
+![](src/grasp.png)
