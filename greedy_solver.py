@@ -18,7 +18,7 @@ class GreedySolver:
     '''Greedy solver running in O(n^2) time.'''
 
     def __init__(self, verbose:bool=True) -> None:
-        self.verbose = True
+        self.verbose = verbose
 
     def greedy_solution(self, start_set:list, T:int, list_order:str='desc') -> Tuple[List[List[int]], List[int], float]:
         '''Generate basic greedy solution in O(n^2) time.\n
