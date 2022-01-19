@@ -1,6 +1,9 @@
 import random
 from statistics import mean, stdev
+from tqdm import tqdm
+
 from generator import Generator
+from global_functions import calculate_penalty
 
 class GeneticSolver:
 
@@ -32,6 +35,17 @@ class GeneticSolver:
                 self.solution[i] = rs
             
             self._calculate_properties()
+        
+        def swap_mutate(self, probability: float = 0.01) -> None:
+            for i in range(self._solver._n):
+                if random.uniform(0, 1) > probability:
+                    continue
+
+                j = random.randrange(i, self._solver._n)
+                
+                self.solution[i], self.solution[j] = self.solution[j], self.solution[i]
+            
+            self._calculate_properties()
 
         def _calculate_properties(self):
             self.num_leftovers = self.solution.count(0)
@@ -48,9 +62,6 @@ class GeneticSolver:
                 self.sums[self.solution[i] - 1] += self._solver.problem[i]
             
             self.fitness = self._solver.get_fitness(self)
-        
-        def __lt__(self, other: 'GeneticSolver.Individual') -> bool:
-            return self.fitness < other.fitness
 
     def __init__(
             self,
@@ -58,76 +69,105 @@ class GeneticSolver:
             T: int,
             pop_size: int,
             mating_ratio: float = 0.5,
-            elitism_ratio: float = 0.1) -> None:
+            elitism_ratio: float = 0.1,
+            leftover_weight: float = 0.01,
+            patience: int = 50) -> None:
         self.problem = problem
         self.T = T
         self.pop_size = pop_size
+        self.leftover_weight = leftover_weight
 
         assert mating_ratio + elitism_ratio < 1
 
         self.mating_pool_size = int(mating_ratio * pop_size)
         self.elite_size = int(elitism_ratio * pop_size)
-        # TODO: standardize problem values & T?
+
+        self.early_stop_counter = 0
+        self.patience = patience
 
         self._n = len(problem)
         self._mean = mean(problem)
         self._stdev = stdev(problem)
 
+        assert self._n > 0
 
         # initialize population
         self.population = [self._random_individual() for _ in range(pop_size)]
-        self.population.sort(reverse=True)
+        self.population.sort(key=lambda x: x.fitness, reverse=True)
         self.total_fitness = sum([sln.fitness for sln in self.population])
 
-        for pop in self.population:
-            print("I fitness:", self.get_fitness(pop))
-
     def run(self, generations: int) -> None:
-        for gen in range(generations):
-            #  select parents
-            mating_pool = []
+        with tqdm(range(generations), postfix={'best': self.population[0].fitness}, disable=True) as progress_bar:
+            for gen in progress_bar:
+                self.early_stop_counter += 1
+                if self.early_stop_counter >= self.patience:
+                    print("Early stopping triggered on generation", gen)
+                    break
 
-            step = self.total_fitness / self.pop_size
-            cur_selection_point = random.uniform(0, step)            
-            total_visited = 0
-            for sln in sorted(self.population):
-                if total_visited + sln.fitness >= cur_selection_point:
-                    cur_selection_point += step
-                    mating_pool.append(sln)
+                #  select parents
+                mating_pool = []
 
-                total_visited += sln.fitness
-            
-            # advance elite to next generation
-            new_generation = self.population[:self.elite_size]
-            assert len(new_generation) == self.elite_size
-            self.total_fitness = sum([sln.fitness for sln in new_generation])
+                step = self.total_fitness / self.pop_size
+                cur_selection_point = random.uniform(0, step)            
+                total_visited = 0
+                for sln in self.population:
+                    if total_visited + sln.fitness >= cur_selection_point:
+                        cur_selection_point += step
+                        mating_pool.append(sln)
 
-            # crossover and generate new population
-            for _ in range(self.pop_size - self.elite_size):
-                a = random.choice(mating_pool)
-                b = random.choice(mating_pool)
-                while a is b:
-                    b = random.choice(mating_pool)
+                    total_visited += sln.fitness
                 
-                child = a.cross(b)
-                self.total_fitness += child.fitness
-                child.mutate(0.02)
-                new_generation.append(child)
-            
-            self.population = new_generation
-            self.population.sort(reverse=True)
-            
-            if gen % 20 == 0:
-                print("generation", gen, ": top 8 solutions:")
-                for i in range(8):
-                    print(" I fit:", new_generation[i].fitness)
+                # advance elite to next generation
+                new_generation = self.population[:self.elite_size]
+
+                assert len(new_generation) <= self.elite_size
+                
+                self.total_fitness = sum([sln.fitness for sln in new_generation])
+
+                # crossover and generate new population
+                for _ in range(self.pop_size - len(new_generation)):
+                    a = random.choice(mating_pool)
+                    b = random.choice(mating_pool)
+                    while a is b:
+                        b = random.choice(mating_pool)
+                    
+                    child = a.cross(b)
+                    # child.mutate(min(0.1 + self.early_stop_counter / self.patience, 0.2))
+                    child.mutate()
+                    child.swap_mutate()
+                    self.total_fitness += child.fitness
+                    new_generation.append(child)
+                
+                old_best = self.population[0].fitness
+
+                self.population = new_generation
+                self.population.sort(key=lambda x: x.fitness, reverse=True)
+                
+                if self.population[0].fitness > old_best:
+                    self.early_stop_counter = 0
+                
+                progress_bar.set_postfix(best = self.population[0].fitness)
+
+                if gen % 100 == 0:
+                    print("generation", gen, ": top 8 solutions:")
+                    for i in range(8):
+                        print(" I fit:", self.population[i].fitness, "sol:", self.get_solution(i))
 
     def get_fitness(self, individual: Individual) -> float:
-        return 1 / (sum(map(lambda x: abs(self.T - x) * abs(self.T - x), individual.sums)) + individual.num_leftovers)
+        return 1 / (sum(map(lambda x: (abs(self.T - x) / self._stdev) ** 2, individual.sums))
+                     + self.leftover_weight * individual.num_leftovers / self._n + 1)
+
+    def get_solution(self, n: int = 0) -> list:
+        sln = self.population[n]
+        res = [[] for _ in range(sln.num_sets)]
+        
+        for i, v in enumerate(sln.solution):
+            if v > 0:
+                res[v - 1].append(self.problem[i])
+
+        return [x for x in res if x != []]
 
     def _random_individual(self) -> 'Individual':
-        # TODO: encourage larger sets?
-        
         s = [0] * self._n
         n_sets = 0
         for i in range(self._n):
@@ -141,18 +181,22 @@ class GeneticSolver:
         
         return GeneticSolver.Individual(s, self)
 
-# generate problem [v]
-# initialize solution population [v]
-# calculate fitness [v]
-# repeat:
-#  select parents [v]
-#  crossover [v]
-#  and generate new population [v]
-#  perform mutation [v]
-#  calculate fitness [v]
+if __name__=='__main__':
+    gen = Generator()
 
-gen = Generator()
-gs = GeneticSolver(gen.generate_random_set(40), 20, pop_size=100, elitism_ratio=0.05)
+    # basic functionality demo
+    gs = GeneticSolver(
+        [0, 1, 2, 3, 4, 6, 7, 8, 9, 10, 11], T=10,
+        pop_size=100,
+        elitism_ratio=0.2,
+        patience=200,
+        mating_ratio=0.4,
+        leftover_weight=0.01
+    )
+    print(gs.get_fitness(GeneticSolver.Individual([1, 2, 3, 4, 5, 5, 4, 3, 2, 1, 0], gs)))
+    gs.run(10000)
+    print("Square distances from T:", list(map(lambda x: abs(gs.T - x) ** 2, gs.population[0].sums)))
+    print(gs.population[0].solution)
+    best = gs.get_solution()
+    print("Best solution:", best, ", score:", gs.population[0].num_leftovers / gs._n)
 
-gs.run(800)
-print(gs.population[0].sums)
