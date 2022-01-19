@@ -3,7 +3,6 @@ from statistics import mean, stdev
 from tqdm import tqdm
 
 from generator import Generator
-from global_functions import calculate_penalty
 
 class GeneticSolver:
 
@@ -13,13 +12,15 @@ class GeneticSolver:
         def __init__(self, solution: list, solver: 'GeneticSolver') -> None:
             self.solution = solution
             self._solver = solver
-            self._calculate_properties()
         
         def cross(self, other: 'GeneticSolver.Individual') -> 'GeneticSolver.Individual':
             selection = [random.choice([False, True]) for _ in range(self._solver._n)]
             selector = lambda i: self.solution[i] * selection[i] + other.solution[i] * (not selection[i])
 
-            return GeneticSolver.Individual([selector(i) for i in range(self._solver._n)], self._solver)
+            ind = GeneticSolver.Individual([selector(i) for i in range(self._solver._n)], self._solver)
+            ind.recalculate()
+
+            return ind
         
         def mutate(self, probability: float = 0.01) -> None:
             for i in range(self._solver._n):
@@ -33,8 +34,6 @@ class GeneticSolver:
                     rs = self.num_sets
                 
                 self.solution[i] = rs
-            
-            self._calculate_properties()
         
         def swap_mutate(self, probability: float = 0.01) -> None:
             for i in range(self._solver._n):
@@ -44,10 +43,8 @@ class GeneticSolver:
                 j = random.randrange(i, self._solver._n)
                 
                 self.solution[i], self.solution[j] = self.solution[j], self.solution[i]
-            
-            self._calculate_properties()
 
-        def _calculate_properties(self):
+        def recalculate(self):
             self.num_leftovers = self.solution.count(0)
             # self.num_sets = len(set(self.solution)) - (self.num_leftovers > 0)
             self.num_sets = max(self.solution)
@@ -97,7 +94,7 @@ class GeneticSolver:
         self.total_fitness = sum([sln.fitness for sln in self.population])
 
     def run(self, generations: int) -> None:
-        with tqdm(range(generations), postfix={'best': self.population[0].fitness}, disable=True) as progress_bar:
+        with tqdm(range(generations), postfix={'best': self.population[0].fitness}, disable=False) as progress_bar:
             for gen in progress_bar:
                 self.early_stop_counter += 1
                 if self.early_stop_counter >= self.patience:
@@ -133,8 +130,9 @@ class GeneticSolver:
                     
                     child = a.cross(b)
                     # child.mutate(min(0.1 + self.early_stop_counter / self.patience, 0.2))
-                    child.mutate()
-                    child.swap_mutate()
+                    child.mutate(0.03)
+                    child.swap_mutate(0.01)
+                    child.recalculate()
                     self.total_fitness += child.fitness
                     new_generation.append(child)
                 
@@ -148,14 +146,14 @@ class GeneticSolver:
                 
                 progress_bar.set_postfix(best = self.population[0].fitness)
 
-                if gen % 100 == 0:
-                    print("generation", gen, ": top 8 solutions:")
-                    for i in range(8):
-                        print(" I fit:", self.population[i].fitness, "sol:", self.get_solution(i))
+                # if gen % 100 == 0:
+                #     print("generation", gen, ": top 8 solutions:")
+                #     for i in range(8):
+                #         print(" I fit:", self.population[i].fitness, "sol:", self.get_solution(i))
 
     def get_fitness(self, individual: Individual) -> float:
-        return 1 / (sum(map(lambda x: (abs(self.T - x) / self._stdev) ** 2, individual.sums))
-                     + self.leftover_weight * individual.num_leftovers / self._n + 1)
+        return 1 / (1 + sum(map(lambda x: (abs(self.T - x) / self._stdev) ** 2, individual.sums))
+                     + self.leftover_weight * individual.num_leftovers / self._n)
 
     def get_solution(self, n: int = 0) -> list:
         sln = self.population[n]
@@ -168,35 +166,35 @@ class GeneticSolver:
         return [x for x in res if x != []]
 
     def _random_individual(self) -> 'Individual':
+        max_n_sets = random.randint(1, self._n)
         s = [0] * self._n
         n_sets = 0
         for i in range(self._n):
-            rs = random.randint(0, self._n)
+            rs = random.randint(0, max_n_sets)
 
             if rs > n_sets:
                 n_sets += 1
                 rs = n_sets
             
             s[i] = rs
+
+        ind = GeneticSolver.Individual(s, self)
+        ind.recalculate()
         
-        return GeneticSolver.Individual(s, self)
+        return ind
 
 if __name__=='__main__':
     gen = Generator()
 
-    # basic functionality demo
     gs = GeneticSolver(
-        [0, 1, 2, 3, 4, 6, 7, 8, 9, 10, 11], T=10,
+        gen.generate_random_set(100, 0, 120), T=900,
         pop_size=100,
+        patience=2000,
         elitism_ratio=0.2,
-        patience=200,
-        mating_ratio=0.4,
         leftover_weight=0.01
     )
-    print(gs.get_fitness(GeneticSolver.Individual([1, 2, 3, 4, 5, 5, 4, 3, 2, 1, 0], gs)))
-    gs.run(10000)
+    gs.run(20000)
     print("Square distances from T:", list(map(lambda x: abs(gs.T - x) ** 2, gs.population[0].sums)))
     print(gs.population[0].solution)
     best = gs.get_solution()
     print("Best solution:", best, ", score:", gs.population[0].num_leftovers / gs._n)
-
