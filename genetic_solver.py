@@ -1,6 +1,8 @@
 import random
 from statistics import mean, stdev
+from datetime import datetime
 from tqdm import tqdm
+import matplotlib.pyplot as plt
 
 from generator import Generator
 
@@ -60,6 +62,36 @@ class GeneticSolver:
             
             self.fitness = self._solver.get_fitness(self)
 
+    class Logger:
+        def __init__(self, parameters: list) -> None:
+            self.series = {pn: [] for pn in parameters}
+            self.initial = None
+        
+        def log_initial(self, solver: 'GeneticSolver') -> None:
+            self.initial = {k: v for k, v in solver.__dict__.items() if k[0] != '_' and isinstance(v, (int, float, bool))}
+            self.initial['problem'] = solver.problem
+        
+        def log_parameters(self, **kwargs) -> None:
+            for k, v in kwargs.items():
+                self.series[k].append(v)
+            
+        def show(self, param: str) -> None:
+            plt.plot(self.series[param])
+            plt.title(param)
+            plt.show()
+        
+        def save(self, path: str, mode: str = 'is') -> None:
+            with open(path + datetime.now().strftime("%Y-%m-%d_%H-%M-%S") + ".txt", 'x') as f:
+                f.write("GENETIC SOLVER REPORT\n")
+                if 'i' in mode and self.initial:
+                    for k, v in self.initial.items():
+                        f.write(f" {k}: {str(v)}\n")
+
+                if 's' in mode:
+                    f.write("Tracked parameters:\n")
+                    for k, v in self.series.items():
+                        f.write(f" {k}: {str(v)}\n")
+
     def __init__(
             self,
             problem: list,
@@ -67,19 +99,25 @@ class GeneticSolver:
             pop_size: int,
             mating_ratio: float = 0.5,
             elitism_ratio: float = 0.1,
+            mutation_rate: float = 0.01,
+            swap_mutation_rate: float = 0.01,
             leftover_weight: float = 0.01,
             patience: int = 50) -> None:
         self.problem = problem
         self.T = T
         self.pop_size = pop_size
+        self.mutation_rate = mutation_rate
+        self.swap_mutation_rate = swap_mutation_rate
         self.leftover_weight = leftover_weight
+
+        self._logger = GeneticSolver.Logger(["best_fit", "avg_fit"])
 
         assert mating_ratio + elitism_ratio < 1
 
         self.mating_pool_size = int(mating_ratio * pop_size)
         self.elite_size = int(elitism_ratio * pop_size)
 
-        self.early_stop_counter = 0
+        self._early_stop_counter = 0
         self.patience = patience
 
         self._n = len(problem)
@@ -93,11 +131,13 @@ class GeneticSolver:
         self.population.sort(key=lambda x: x.fitness, reverse=True)
         self.total_fitness = sum([sln.fitness for sln in self.population])
 
+        self._logger.log_initial(self)
+
     def run(self, generations: int) -> None:
         with tqdm(range(generations), postfix={'best': self.population[0].fitness}, disable=False) as progress_bar:
             for gen in progress_bar:
-                self.early_stop_counter += 1
-                if self.early_stop_counter >= self.patience:
+                self._early_stop_counter += 1
+                if self._early_stop_counter >= self.patience:
                     print("Early stopping triggered on generation", gen)
                     break
 
@@ -126,12 +166,14 @@ class GeneticSolver:
                     a = random.choice(mating_pool)
                     b = random.choice(mating_pool)
                     while a is b:
+                        if len(mating_pool) < 2:
+                            break
+
                         b = random.choice(mating_pool)
                     
                     child = a.cross(b)
-                    # child.mutate(min(0.1 + self.early_stop_counter / self.patience, 0.2))
-                    child.mutate(0.03)
-                    child.swap_mutate(0.01)
+                    child.mutate(self.mutation_rate)
+                    child.swap_mutate(self.swap_mutation_rate)
                     child.recalculate()
                     self.total_fitness += child.fitness
                     new_generation.append(child)
@@ -142,9 +184,13 @@ class GeneticSolver:
                 self.population.sort(key=lambda x: x.fitness, reverse=True)
                 
                 if self.population[0].fitness > old_best:
-                    self.early_stop_counter = 0
+                    self._early_stop_counter = 0
+                    progress_bar.set_postfix(best=self.population[0].fitness)
                 
-                progress_bar.set_postfix(best = self.population[0].fitness)
+                self._logger.log_parameters(
+                    best_fit=self.population[0].fitness,
+                    avg_fit=self.total_fitness
+                )
 
                 # if gen % 100 == 0:
                 #     print("generation", gen, ": top 8 solutions:")
@@ -191,10 +237,15 @@ if __name__=='__main__':
         pop_size=100,
         patience=2000,
         elitism_ratio=0.2,
+        mutation_rate=0.03,
+        swap_mutation_rate=0.02,
         leftover_weight=0.01
     )
-    gs.run(20000)
+    gs.run(500)
     print("Square distances from T:", list(map(lambda x: abs(gs.T - x) ** 2, gs.population[0].sums)))
     print(gs.population[0].solution)
     best = gs.get_solution()
     print("Best solution:", best, ", score:", gs.population[0].num_leftovers / gs._n)
+    gs._logger.show("best_fit")
+    gs._logger.show("avg_fit")
+    gs._logger.save("log/")
