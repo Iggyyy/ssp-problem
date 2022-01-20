@@ -212,8 +212,8 @@ class GRASP:
         return self.best_achieved_score
 
 if __name__ == '__main__':
-    grasp = GRASP(verbose=True, dropout_rate=0.8, RCL_count=50)
-    grasp.perform_GRASP(iterations=200)
+    grasp = GRASP(verbose=False, dropout_rate=0.2, RCL_count=10)
+    grasp.perform_GRASP(iterations=50)
 
     print('GRASP: ')
     print(f'Solution:\n{grasp.get_solution()}\nLeftovers:\n{grasp.get_leftovers()}\nScore:\n{grasp.get_solution_penalty()}\nScore history:\n{grasp.get_score_history()}')
