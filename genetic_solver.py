@@ -1,4 +1,5 @@
 import random
+import os
 from statistics import mean, stdev
 from datetime import datetime
 from tqdm import tqdm
@@ -66,6 +67,7 @@ class GeneticSolver:
         def __init__(self, parameters: list) -> None:
             self.series = {pn: [] for pn in parameters}
             self.initial = None
+            self.solutions = {}
         
         def log_initial(self, solver: 'GeneticSolver') -> None:
             self.initial = {k: v for k, v in solver.__dict__.items() if k[0] != '_' and isinstance(v, (int, float, bool))}
@@ -74,23 +76,47 @@ class GeneticSolver:
         def log_parameters(self, **kwargs) -> None:
             for k, v in kwargs.items():
                 self.series[k].append(v)
+        
+        def log_solution(self, key: str, sln: 'GeneticSolver.Individual') -> None:
+            self.solutions[key] = sln
             
         def show(self, param: str) -> None:
             plt.plot(self.series[param])
             plt.title(param)
             plt.show()
         
-        def save(self, path: str, mode: str = 'is') -> None:
-            with open(path + datetime.now().strftime("%Y-%m-%d_%H-%M-%S") + ".txt", 'x') as f:
+        def save(self, path: str, mode: str = 'ips') -> None:
+            if path[-1] != '/':
+                path += '/'
+            path += datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+            
+            os.makedirs(path)
+            
+            with open(f"{path}/log.txt", 'x') as f:
                 f.write("GENETIC SOLVER REPORT\n")
                 if 'i' in mode and self.initial:
                     for k, v in self.initial.items():
                         f.write(f" {k}: {str(v)}\n")
-
+                
                 if 's' in mode:
+                    f.write("Saved solutions:")
+                    for k, v in self.solutions.items():
+                        f.write(f" {k}:\n")
+                        for attr in v.__slots__:
+                            if attr[0] != '_' and isinstance(getattr(v, attr), (int, float, bool, list)):
+                                f.write(f"  {attr}: {str(getattr(v, attr))}\n")
+
+                if 'p' in mode:
                     f.write("Tracked parameters:\n")
                     for k, v in self.series.items():
                         f.write(f" {k}: {str(v)}\n")
+
+            if 'g' in mode:
+                for k, v in self.series.items():
+                    plt.figure()
+                    plt.plot(v)
+                    plt.title(k)
+                    plt.savefig(f"{path}/graph_{k}.png")
 
     def __init__(
             self,
@@ -196,6 +222,8 @@ class GeneticSolver:
                 #     print("generation", gen, ": top 8 solutions:")
                 #     for i in range(8):
                 #         print(" I fit:", self.population[i].fitness, "sol:", self.get_solution(i))
+        
+        self._logger.log_solution("best", self.population[0])
 
     def get_fitness(self, individual: Individual) -> float:
         return 1 / (1 + sum(map(lambda x: (abs(self.T - x) / self._stdev) ** 2, individual.sums))
@@ -233,7 +261,7 @@ if __name__=='__main__':
     gen = Generator()
 
     gs = GeneticSolver(
-        gen.generate_random_set(100, 0, 120), T=900,
+        gen.generate_random_set(100, 0, 120), T=600,
         pop_size=100,
         patience=2000,
         elitism_ratio=0.2,
@@ -246,6 +274,4 @@ if __name__=='__main__':
     print(gs.population[0].solution)
     best = gs.get_solution()
     print("Best solution:", best, ", score:", gs.population[0].num_leftovers / gs._n)
-    gs._logger.show("best_fit")
-    gs._logger.show("avg_fit")
-    gs._logger.save("log/")
+    gs._logger.save("log/", mode='ipgs')
