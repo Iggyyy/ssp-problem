@@ -1,3 +1,4 @@
+from email import generator
 import random
 import os
 from statistics import mean, stdev
@@ -64,16 +65,23 @@ class GeneticSolver:
             self.fitness = self._solver.get_fitness(self)
 
     class Logger:
-        def __init__(self, parameters: list) -> None:
+        def __init__(self, parameters: list, interval: int = 1) -> None:
             self.series = {pn: [] for pn in parameters}
+            self.generation = []
             self.initial = None
             self.solutions = {}
+            self.interval = interval
         
         def log_initial(self, solver: 'GeneticSolver') -> None:
             self.initial = {k: v for k, v in solver.__dict__.items() if k[0] != '_' and isinstance(v, (int, float, bool))}
             self.initial['problem'] = solver.problem
         
-        def log_parameters(self, **kwargs) -> None:
+        def log_parameters(self, generation: int, **kwargs) -> None:
+            if generation % self.interval:
+                return
+            
+            self.generation.append(generation)
+
             for k, v in kwargs.items():
                 self.series[k].append(v)
         
@@ -114,7 +122,7 @@ class GeneticSolver:
             if 'g' in mode:
                 for k, v in self.series.items():
                     plt.figure()
-                    plt.plot(v)
+                    plt.plot(self.generation, v)
                     plt.title(k)
                     plt.savefig(f"{path}/graph_{k}.png")
 
@@ -136,7 +144,7 @@ class GeneticSolver:
         self.swap_mutation_rate = swap_mutation_rate
         self.leftover_weight = leftover_weight
 
-        self._logger = GeneticSolver.Logger(["best_fit", "avg_fit"])
+        self._logger = GeneticSolver.Logger(["best_fit", "avg_fit"], interval=50)
 
         assert mating_ratio + elitism_ratio < 1
 
@@ -214,14 +222,10 @@ class GeneticSolver:
                     progress_bar.set_postfix(best=self.population[0].fitness)
                 
                 self._logger.log_parameters(
+                    generation=gen,
                     best_fit=self.population[0].fitness,
-                    avg_fit=self.total_fitness
+                    avg_fit=self.total_fitness / self.pop_size
                 )
-
-                # if gen % 100 == 0:
-                #     print("generation", gen, ": top 8 solutions:")
-                #     for i in range(8):
-                #         print(" I fit:", self.population[i].fitness, "sol:", self.get_solution(i))
         
         self._logger.log_solution("best", self.population[0])
 
@@ -263,13 +267,13 @@ if __name__=='__main__':
     gs = GeneticSolver(
         gen.generate_random_set(100, 0, 120), T=600,
         pop_size=100,
-        patience=2000,
+        patience=10000,
         elitism_ratio=0.2,
         mutation_rate=0.03,
         swap_mutation_rate=0.02,
         leftover_weight=0.01
     )
-    gs.run(500)
+    gs.run(100000)
     print("Square distances from T:", list(map(lambda x: abs(gs.T - x) ** 2, gs.population[0].sums)))
     print(gs.population[0].solution)
     best = gs.get_solution()
