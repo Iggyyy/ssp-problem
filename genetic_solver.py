@@ -392,6 +392,7 @@ if __name__=='__main__':
     args = parser.parse_args()
 
     gen = Generator()
+    greedy = GreedySolver(verbose=False)
 
     problem = gen.generate_random_set(
         args.generator_size,
@@ -400,10 +401,12 @@ if __name__=='__main__':
     )
 
     initial_population = []
-    if 'greedy' not in args.init:
-        greedy = GreedySolver(verbose=False)
-        sln, _, _ = greedy.greedy_solution(problem, args.T)
-        initial_population.append(sln)
+    for word in args.init:
+        tokens = word.split('/')
+        if tokens[0] == 'greedy':
+            param = tokens[1] if len(tokens) > 1 else 'desc'
+            sln, _, _ = greedy.greedy_solution(problem, args.T, param)
+            initial_population.append(sln)
 
     gs = GeneticSolver(
         problem,
