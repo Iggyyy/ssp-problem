@@ -1,12 +1,13 @@
-from email import generator
 import random
 import os
 from statistics import mean, stdev
 from datetime import datetime
+import argparse
 from tqdm import tqdm
 import matplotlib.pyplot as plt
 
 from generator import Generator
+from greedy_solver import GreedySolver
 
 class GeneticSolver:
 
@@ -63,6 +64,12 @@ class GeneticSolver:
                 self.sums[self.solution[i] - 1] += self._solver.problem[i]
             
             self.fitness = self._solver.get_fitness(self)
+        
+        @staticmethod
+        def make(sln: list, solver: 'GeneticSolver') -> 'GeneticSolver.Individual':
+            ind = GeneticSolver.Individual(sln, solver)
+            ind.recalculate()
+            return ind
 
     class Logger:
         def __init__(self, parameters: list, interval: int = 1) -> None:
@@ -131,6 +138,7 @@ class GeneticSolver:
             problem: list,
             T: int,
             pop_size: int,
+            initial_pop: list = [],
             mating_ratio: float = 0.5,
             elitism_ratio: float = 0.1,
             mutation_rate: float = 0.01,
@@ -161,7 +169,8 @@ class GeneticSolver:
         assert self._n > 0
 
         # initialize population
-        self.population = [self._random_individual() for _ in range(pop_size)]
+        self.population = [GeneticSolver.Individual.make(self._to_internal_repr(sln), self) for sln in initial_pop]
+        self.population += [self._random_individual() for _ in range(pop_size - len(self.population))]
         self.population.sort(key=lambda x: x.fitness, reverse=True)
         self.total_fitness = sum([sln.fitness for sln in self.population])
 
@@ -171,7 +180,7 @@ class GeneticSolver:
         with tqdm(range(generations), postfix={'best': self.population[0].fitness}, disable=False) as progress_bar:
             for gen in progress_bar:
                 self._early_stop_counter += 1
-                if self._early_stop_counter >= self.patience:
+                if self._early_stop_counter >= self.patience and self.patience > 0:
                     print("Early stopping triggered on generation", gen)
                     break
 
@@ -260,22 +269,157 @@ class GeneticSolver:
         ind.recalculate()
         
         return ind
+    
+    def _to_internal_repr(self, sln: list) -> list:
+        i_sln = [0] * self._n
+
+        for setn, setv in enumerate(sln, 1):
+            for p in setv:
+                # find index of p in problem set
+                p_idx = 0
+
+                # in case we want to do a run with multiple occcurences of a number in problem set
+                while p_idx < self._n:
+                    p_idx = self.problem.index(p, p_idx)
+
+                    if i_sln[p_idx] == 0:
+                        i_sln[p_idx] = setn
+                        break
 
 if __name__=='__main__':
+    parser = argparse.ArgumentParser()
+    problem_group = parser.add_argument_group('problem')
+    problem_group.add_argument('-T', type=int, default=600, help="Target subset sum")
+    problem_group.add_argument('--g:s', '--generator_size',
+        type=int,
+        default=100,
+        dest="generator_size",
+        help="Size of problem set to generate",
+        metavar="SIZE"
+    )
+    problem_group.add_argument('--g:m', '--generator_min',
+        type=int,
+        default=0,
+        dest="generator_min",
+        help="Min value in problem set",
+        metavar="MIN"
+    )
+    problem_group.add_argument('--g:M', '--generator_max',
+        type=int,
+        default=100,
+        dest="generator_max",
+        help="Max value in problem set",
+        metavar="MAX"
+    )
+
+    parser.add_argument('-g', '--generations',
+        type=int,
+        default=100000,
+        dest="generations",
+        help="Number of gnerations to simulate"
+    )
+    parser.add_argument('-s', '--pop_size',
+        type=int,
+        default=100,
+        dest="pop_size",
+        help="GA population size",
+        metavar="SIZE"
+    )
+    parser.add_argument('--mating', type=float, default=0.5, dest="mating", help="Percentage of population to be considered for mating")
+    parser.add_argument('-e', '--elitism',
+        type=float,
+        default=0.1,
+        dest="elitism",
+        help="Percentage of top performers to graduate to next generation, bypassing selection"
+    )
+    parser.add_argument('-m', '--mr', '--mutation_rate',
+        type=float,
+        default=0.03,
+        dest="mr",
+        help="Probability of a gene undergoing random mutation after crossover",
+        metavar="RATE"
+    )
+    parser.add_argument('--smr', '--swap_mutation_rate',
+        type=float,
+        default=0.02,
+        dest="smr",
+        help="Probability of a gene swapping its value with a randomly chosen, different gene after crossover",
+        metavar="RATE"
+    )
+    parser.add_argument('--lw', '--leftover_weight',
+        type=float,
+        default=0.01,
+        dest="lw",
+        help="Weight of the leftover ratio in the fitness function", metavar="WEIGHT"
+    )
+    parser.add_argument('-p', '--patience',
+        type=int,
+        default=10000,
+        dest="patience",
+        help="Number of generations with no improvement to best solution before early termination. 0 to disable"
+    )
+
+    logging_group = parser.add_argument_group('logging')
+    logging_group.add_argument('-R', '--sr', '--save_results',
+        action="store_true",
+        dest="save_results",
+        help="Whether a report should be generated"
+    )
+    logging_group.add_argument('--r:p', '--results_path',
+        type=str,
+        default='log/',
+        dest="results_path",
+        help="Path to save report at",
+        metavar="PATH"
+    )
+    logging_group.add_argument('--r:m', '--results_mode',
+        type=str,
+        default='ipgs',
+        dest="results_mode",
+        help="What to include in the generated report",
+        metavar="MODE"
+    )
+
+    parser.add_argument('-i', '--init', '--initial_population',
+        nargs="*",
+        default=[],
+        dest="init",
+        help="Population initializers"
+    )
+
+    args = parser.parse_args()
+
     gen = Generator()
 
-    gs = GeneticSolver(
-        gen.generate_random_set(100, 0, 120), T=600,
-        pop_size=100,
-        patience=10000,
-        elitism_ratio=0.2,
-        mutation_rate=0.03,
-        swap_mutation_rate=0.02,
-        leftover_weight=0.01
+    problem = gen.generate_random_set(
+        args.generator_size,
+        args.generator_min,
+        args.generator_max
     )
-    gs.run(100000)
+
+    initial_population = []
+    if 'greedy' in args.init:
+        greedy = GreedySolver(verbose=False)
+        sln, _, _ = greedy.greedy_solution(problem, args.T)
+        initial_population.append(sln)
+
+    gs = GeneticSolver(
+        problem,
+        T=args.T,
+        pop_size=args.pop_size,
+        initial_pop=initial_population,
+        patience=args.patience,
+        mating_ratio=args.mating,
+        elitism_ratio=args.elitism,
+        mutation_rate=args.mr,
+        swap_mutation_rate=args.smr,
+        leftover_weight=args.lw
+    )
+
+    gs.run(args.generations)
     print("Square distances from T:", list(map(lambda x: abs(gs.T - x) ** 2, gs.population[0].sums)))
     print(gs.population[0].solution)
     best = gs.get_solution()
     print("Best solution:", best, ", score:", gs.population[0].num_leftovers / gs._n)
-    gs._logger.save("log/", mode='ipgs')
+    if args.save_results:
+        gs._logger.save(args.results_path, mode=args.results_mode)
