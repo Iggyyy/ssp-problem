@@ -8,17 +8,16 @@ import matplotlib.pyplot as plt
 
 random.seed(time.time())
 
-ITERATIONS = 10
+TARR = [50000, 100000, 150000, 200000, 250000] 
+ITERATIONS = len(TARR)
 generator = Generator()
 results = defaultdict(list)
 
-for i in range(ITERATIONS):
-    
-    T = 6000
-    problemset = generator.generate_random_set(1000, 0, 1200)
+for i, T in enumerate(TARR):
+    problemset = generator.generate_random_set(size=10000, low=0, high=20000)
     
     grasp = GRASP(verbose=False, problem=problemset, T=T)
-    grasp.perform_GRASP()
+    grasp.perform_GRASP(15)
     results['GRASP'].append(grasp.get_best_achieved_score())
 
     greedy = GreedySolver(verbose=False)
@@ -27,7 +26,7 @@ for i in range(ITERATIONS):
 
 fig= plt.figure()
 labels = ['GRASP', 'Greedy']
-averages = [sum(results[key])/len(results[key])  for key in labels]
+averages = [sum(results[key])/len(results[key]) for key in labels]
 plt.bar(labels, averages)
 plt.xlabel('Algorithms')
 plt.ylabel('Score (the lower the better)')
