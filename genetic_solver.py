@@ -285,6 +285,8 @@ class GeneticSolver:
                     if i_sln[p_idx] == 0:
                         i_sln[p_idx] = setn
                         break
+        
+        return i_sln
 
 if __name__=='__main__':
     parser = argparse.ArgumentParser()
@@ -398,7 +400,7 @@ if __name__=='__main__':
     )
 
     initial_population = []
-    if 'greedy' in args.init:
+    if 'greedy' not in args.init:
         greedy = GreedySolver(verbose=False)
         sln, _, _ = greedy.greedy_solution(problem, args.T)
         initial_population.append(sln)
