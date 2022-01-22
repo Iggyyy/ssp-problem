@@ -38,7 +38,7 @@ def calculate_penalty(T:int, list_of_sets:list, leftovers:list, penalty_magnitud
     At the moment, penalty is number of leftovers*penalty_magnitude / number of items in subsets '''
     count = sum([len(set) for set in list_of_sets]) + len(leftovers)
 
-    return (len(leftovers) * penalty_magnitude) / (0.0001 if count == 0 else count)
+    return (len(leftovers) * penalty_magnitude) / max(0.0001, count)
 
 if __name__ == '__main__':
 
