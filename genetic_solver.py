@@ -17,6 +17,7 @@ class GeneticSolver:
         def __init__(self, solution: list, solver: 'GeneticSolver') -> None:
             self.solution = solution
             self._solver = solver
+            self.fitness = 0.0
         
         def cross(self, other: 'GeneticSolver.Individual') -> 'GeneticSolver.Individual':
             selection = [random.choice([False, True]) for _ in range(self._solver._n)]
@@ -114,7 +115,7 @@ class GeneticSolver:
                         f.write(f" {k}: {str(v)}\n")
                 
                 if 's' in mode:
-                    f.write("Saved solutions:")
+                    f.write("Saved solutions:\n")
                     for k, v in self.solutions.items():
                         f.write(f" {k}:\n")
                         for attr in v.__slots__:
@@ -152,7 +153,7 @@ class GeneticSolver:
         self.swap_mutation_rate = swap_mutation_rate
         self.leftover_weight = leftover_weight
 
-        self._logger = GeneticSolver.Logger(["best_fit", "avg_fit"], interval=50)
+        self._logger = GeneticSolver.Logger(["best_fit", "avg_fit", "best_viable_fit"], interval=50)
 
         assert mating_ratio + elitism_ratio < 1
 
@@ -167,6 +168,9 @@ class GeneticSolver:
         self._stdev = stdev(problem)
 
         assert self._n > 0
+
+        # dummy individual for comparisons only
+        self._best_viable = GeneticSolver.Individual([], None)
 
         # initialize population
         self.population = [GeneticSolver.Individual.make(self._to_internal_repr(sln), self) for sln in initial_pop]
@@ -220,6 +224,9 @@ class GeneticSolver:
                     child.recalculate()
                     self.total_fitness += child.fitness
                     new_generation.append(child)
+
+                    if child.fitness > self._best_viable.fitness and sum(child.sums) == len(child.sums) * self.T:
+                        self._best_viable = child
                 
                 old_best = self.population[0].fitness
 
@@ -233,10 +240,12 @@ class GeneticSolver:
                 self._logger.log_parameters(
                     generation=gen,
                     best_fit=self.population[0].fitness,
-                    avg_fit=self.total_fitness / self.pop_size
+                    avg_fit=self.total_fitness / self.pop_size,
+                    best_viable_fit=self._best_viable.fitness
                 )
         
         self._logger.log_solution("best", self.population[0])
+        self._logger.log_solution("best_viable", self._best_viable)
 
     def get_fitness(self, individual: Individual) -> float:
         return 1 / (1 + sum(map(lambda x: (abs(self.T - x) / self._stdev) ** 2, individual.sums))
