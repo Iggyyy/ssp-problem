@@ -229,8 +229,12 @@ class GeneticSolver:
                     self.total_fitness += child.fitness
                     new_generation.append(child)
 
-                    if child.fitness > self._best_viable.fitness and sum(child.sums) == len(child.sums) * self.T:
-                        self._best_viable = child
+                    if child.fitness > self._best_viable.fitness:
+                        for s in child.sums:
+                            if s != 0 and s != self.T:
+                                break
+                        else:
+                            self._best_viable = child
                 
                 old_best = self.population[0].fitness
 
