@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 
 from generator import Generator
 from greedy_solver import GreedySolver
+from GRASP import GRASP
 
 class GeneticSolver:
 
@@ -17,6 +18,9 @@ class GeneticSolver:
         def __init__(self, solution: list, solver: 'GeneticSolver') -> None:
             self.solution = solution
             self._solver = solver
+            self.num_leftovers = 0
+            self.num_sets = 0
+            self.sums = []
             self.fitness = 0.0
         
         def cross(self, other: 'GeneticSolver.Individual') -> 'GeneticSolver.Individual':
@@ -416,6 +420,14 @@ if __name__=='__main__':
             param = tokens[1] if len(tokens) > 1 else 'desc'
             sln, _, _ = greedy.greedy_solution(problem, args.T, param)
             initial_population.append(sln)
+        elif tokens[0] == 'grasp':
+            grasp = GRASP(
+                problem=problem,
+                T=args.T,
+                RCL_count=int(tokens[2]) if len(tokens) > 2 else 20,
+                dropout_rate=float(tokens[3]) if len(tokens) > 3 else 0.5
+            )
+            grasp.perform_GRASP(int(tokens[1]) if len(tokens) > 1 else 100)
 
     gs = GeneticSolver(
         problem,
