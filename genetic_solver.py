@@ -16,6 +16,11 @@ class GeneticSolver:
         __slots__ = ["solution", "num_leftovers", "num_sets", "sums", "fitness", "_solver"]
 
         def __init__(self, solution: list, solver: 'GeneticSolver') -> None:
+            '''
+            Params:
+                `solution`: subset membership vector representation of this individual's solution
+                `solver`: GeneticSolver instance to which this individual belongs
+            '''
             self.solution = solution
             self._solver = solver
             self.num_leftovers = 0
@@ -24,15 +29,24 @@ class GeneticSolver:
             self.fitness = 0.0
         
         def cross(self, other: 'GeneticSolver.Individual') -> 'GeneticSolver.Individual':
+            '''
+            Perform crossover between this individual and `other`, return the child
+            Params:
+                `other`: other individual instance to perform crossover with
+            '''
             selection = [random.choice([False, True]) for _ in range(self._solver._n)]
             selector = lambda i: self.solution[i] * selection[i] + other.solution[i] * (not selection[i])
 
             ind = GeneticSolver.Individual([selector(i) for i in range(self._solver._n)], self._solver)
-            ind.recalculate()
 
             return ind
         
         def mutate(self, probability: float = 0.01) -> None:
+            '''
+            Perform random mutation on this individual's chromosome
+            Params:
+                `probability`: (independent) probability of a gene changing
+            '''
             for i in range(self._solver._n):
                 if random.uniform(0, 1) > probability:
                     continue
@@ -46,6 +60,12 @@ class GeneticSolver:
                 self.solution[i] = rs
         
         def swap_mutate(self, probability: float = 0.01) -> None:
+            '''
+            Perform swap mutation on this individual's chromosome. If a gene initiates mutation,
+            the other gene is selected randomly from all genes in the chromosome (incl. the initiating gene)
+            Params:
+                `probability`: (independent) probability of a gene initiating a change
+            '''
             for i in range(self._solver._n):
                 if random.uniform(0, 1) > probability:
                     continue
@@ -55,11 +75,9 @@ class GeneticSolver:
                 self.solution[i], self.solution[j] = self.solution[j], self.solution[i]
 
         def recalculate(self):
+            '''Perform the more expensive calculations needed for fitness estimation, etc.'''
             self.num_leftovers = self.solution.count(0)
-            # self.num_sets = len(set(self.solution)) - (self.num_leftovers > 0)
             self.num_sets = max(self.solution)
-
-            # prune empty sets?
 
             self.sums = [0] * self.num_sets
             for i in range(self._solver._n):
