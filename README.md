@@ -3,6 +3,12 @@
 Znaleźć niepuste i niezależne podzbiory, które muszą sumować się do danego T, zostawiając zarazem najmniej leftovers. Jeśli algorytm nie wykorzysta wszystkich elementów, to dostaje karę od ilości pozostawionych elementów. Kiedy kara jest inf to algorytm szuka rozwiązania pokrywającego cały zbiór.
 
 ***
+## Użytkowanie
+Do skryptu solve.py możemy podać plik json w określonym formacie oraz algorytm jakim problem ma być rozwiązany. Skrypt wygeneruje rozwiązanie i zapisze je w json.
+
+```cmd
+python solve.py test.json grasp
+```
 
 ## Kluczowe elementy
 
