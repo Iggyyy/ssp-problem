@@ -1,6 +1,7 @@
 import random
 import os
 from statistics import mean, stdev
+import json
 from datetime import datetime
 import argparse
 from tqdm import tqdm
@@ -74,7 +75,7 @@ class GeneticSolver:
                 
                 self.solution[i], self.solution[j] = self.solution[j], self.solution[i]
 
-        def recalculate(self):
+        def recalculate(self) -> None:
             '''Perform the more expensive calculations needed for fitness estimation, etc.'''
             self.num_leftovers = self.solution.count(0)
             self.num_sets = max(self.solution)
@@ -88,6 +89,9 @@ class GeneticSolver:
             
             self.fitness = self._solver.get_fitness(self)
         
+        def get_dict(self) -> dict:
+            return {a: str(getattr(self, a)) for a in self.__slots__ if a[0] != '_' and isinstance(getattr(self, a), (int, float, bool, list))}
+        
         @staticmethod
         def make(sln: list, solver: 'GeneticSolver') -> 'GeneticSolver.Individual':
             ind = GeneticSolver.Individual(sln, solver)
@@ -95,8 +99,8 @@ class GeneticSolver:
             return ind
 
     class Logger:
-        def __init__(self, parameters: list, interval: int = 1) -> None:
-            self.series = {pn: [] for pn in parameters}
+        def __init__(self, metrics: list, interval: int = 1) -> None:
+            self.series = {pn: [] for pn in metrics}
             self.generation = []
             self.initial = None
             self.solutions = {}
@@ -106,7 +110,7 @@ class GeneticSolver:
             self.initial = {k: v for k, v in solver.__dict__.items() if k[0] != '_' and isinstance(v, (int, float, bool))}
             self.initial['problem'] = solver.problem
         
-        def log_parameters(self, generation: int, **kwargs) -> None:
+        def log_metrics(self, generation: int, **kwargs) -> None:
             if generation % self.interval:
                 return
             
@@ -123,7 +127,7 @@ class GeneticSolver:
             plt.title(param)
             plt.show()
         
-        def save(self, path: str, mode: str = 'ips') -> None:
+        def save(self, path: str, mode: str = 'ims') -> None:
             if path[-1] != '/':
                 path += '/'
             path += datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
@@ -144,8 +148,8 @@ class GeneticSolver:
                             if attr[0] != '_' and isinstance(getattr(v, attr), (int, float, bool, list)):
                                 f.write(f"  {attr}: {str(getattr(v, attr))}\n")
 
-                if 'p' in mode:
-                    f.write("Tracked parameters:\n")
+                if 'm' in mode:
+                    f.write("Tracked metrics:\n")
                     for k, v in self.series.items():
                         f.write(f" {k}: {str(v)}\n")
 
@@ -155,6 +159,21 @@ class GeneticSolver:
                     plt.plot(self.generation, v)
                     plt.title(k)
                     plt.savefig(f"{path}/graph_{k}.png")
+        
+        def get_dict(self, mode: str = 'ims') -> dict:
+            result = {'algorithm': 'genetic'}
+
+            if 'i' in mode:
+                result['parameters'] = self.initial
+            
+            if 'm' in mode:
+                result['metrics'] = self.series
+                result['metrics']['generation'] = self.generation
+            
+            if 's' in mode:
+                result['solutions'] = {key: sln.get_dict() for key, sln in self.solutions.items()}
+            
+            return result
 
     def __init__(
             self,
@@ -167,15 +186,18 @@ class GeneticSolver:
             mutation_rate: float = 0.01,
             swap_mutation_rate: float = 0.01,
             leftover_weight: float = 0.01,
-            patience: int = 50) -> None:
+            patience: int = 50,
+            log_interval: int = 50,
+            silent: bool = False) -> None:
         self.problem = problem
         self.T = T
         self.pop_size = pop_size
         self.mutation_rate = mutation_rate
         self.swap_mutation_rate = swap_mutation_rate
         self.leftover_weight = leftover_weight
+        self.silent = silent
 
-        self._logger = GeneticSolver.Logger(["best_fit", "avg_fit", "best_viable_fit"], interval=50)
+        self._logger = GeneticSolver.Logger(["best_fit", "avg_fit", "best_viable_fit"], interval=log_interval)
 
         assert mating_ratio + elitism_ratio < 1
 
@@ -203,7 +225,7 @@ class GeneticSolver:
         self._logger.log_initial(self)
 
     def run(self, generations: int) -> None:
-        with tqdm(range(generations), postfix={'best': self.population[0].fitness}, disable=False) as progress_bar:
+        with tqdm(range(generations), postfix={'best': self.population[0].fitness}, disable=self.silent) as progress_bar:
             for gen in progress_bar:
                 self._early_stop_counter += 1
                 if self._early_stop_counter >= self.patience and self.patience > 0:
@@ -263,7 +285,7 @@ class GeneticSolver:
                     self._early_stop_counter = 0
                     progress_bar.set_postfix(best=self.population[0].fitness)
                 
-                self._logger.log_parameters(
+                self._logger.log_metrics(
                     generation=gen,
                     best_fit=self.population[0].fitness,
                     avg_fit=self.total_fitness / self.pop_size,
@@ -278,6 +300,11 @@ class GeneticSolver:
                      + self.leftover_weight * individual.num_leftovers / self._n)
 
     def get_solution(self, n: int = 0) -> list:
+        '''
+        Returns n-th best solution in common format
+        Params:
+            `n`: index of solution to return. 0 is best overall.
+        '''
         sln = self.population[n]
         res = [[] for _ in range(sln.num_sets)]
         
@@ -286,6 +313,12 @@ class GeneticSolver:
                 res[v - 1].append(self.problem[i])
 
         return [x for x in res if x != []]
+    
+    def get_result_dict(self, mode: str = 'ims') -> dict:
+        return self._logger.get_dict(mode)
+    
+    def get_parameters(self) -> dict:
+        return self._logger.initial
 
     def _random_individual(self) -> 'Individual':
         max_n_sets = random.randint(1, self._n)
@@ -411,7 +444,7 @@ if __name__=='__main__':
     )
     logging_group.add_argument('--r:m', '--results_mode',
         type=str,
-        default='ipgs',
+        default='imgs',
         dest="results_mode",
         help="What to include in the generated report",
         metavar="MODE"
@@ -470,4 +503,4 @@ if __name__=='__main__':
     best = gs.get_solution()
     print("Best solution:", best, ", score:", gs.population[0].num_leftovers / gs._n)
     if args.save_results:
-        gs._logger.save(args.results_path, mode=args.results_mode)
+       gs._logger.save(args.results_path, mode=args.results_mode)

@@ -51,8 +51,14 @@ with open(json_name) as f:
             result = algorithm.get_result_dict()
             params = algorithm.get_parameters()
         elif 'genetic' in algorithm_name.lower():
-            algorithm = GeneticSolver()
-            #TODO add
+            algorithm = GeneticSolver(
+                problem,
+                T=sumT,
+                silent=True
+            )
+            algorithm.run(300000)
+            result = algorithm.get_result_dict()
+            params = algorithm.get_parameters()
         else:
             algorithm = GreedySolver()
             algorithm.greedy_solution(start_set=problem, T=sumT)
